@@ -75,6 +75,17 @@ $responses = [[200, '<html>maintenance</html>']];
 try { $api->certificate('x.com'); check('non-JSON rejected', false); }
 catch (ApiException $e) { check('non-JSON rejected', $e->errorCode() === 'InvalidResponse'); }
 
+$sent = [];
+$responses = [[525, '<html>cf</html>'], [525, ''], [200, json_encode(['success' => true, 'certificateId' => 'c1'])]];
+check('525 retried until it goes through', $api->initialize('P', 'x.com')['certificateId'] === 'c1' && count($sent) === 3);
+$responses = [[525, ''], [525, ''], [525, '']];
+try { $api->checkStatus('x.com'); check('525 gives up after 2 retries', false); }
+catch (ApiException $e) { check('525 gives up after 2 retries', $e->httpStatus() === 525 && strpos($e->getMessage(), 'could not be reached') !== false); }
+$sent = [];
+$responses = [[502, ''], [200, '{}']];
+try { $api->checkStatus('x.com'); } catch (ApiException $e) {}
+check('502 not retried (may have reached the gateway)', count($sent) === 1);
+
 $responses = [[200, json_encode(['mails' => ['admin@x.com', '', 'webmaster@x.com']])]];
 check('approvers filtered', $api->approvers('x.com', 'PKG') === ['admin@x.com', 'webmaster@x.com']);
 

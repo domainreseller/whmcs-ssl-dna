@@ -21,6 +21,12 @@ class Client
 
     const VERSION = '1.0.0';
 
+    /** Cloudflare statuses meaning the request never reached the gateway. */
+    const UNREACHED = [521, 522, 523, 525, 526];
+
+    /** Extra attempts after an unreached answer. */
+    const RETRIES = 2;
+
     /** Request and response keys whose values never reach a log line. */
     const SECRET_KEYS = ['privateKey', 'privatekey', 'private_key', 'X-API-KEY', 'apiKey', 'api_key'];
 
@@ -42,6 +48,9 @@ class Client
     /** @var callable|null fn(string $method, string $url, array $headers, ?string $body): array{0:int,1:string} */
     private $transport;
 
+    /** @var int microseconds before a retry (multiplied by the attempt number) */
+    private $retryDelay = 750000;
+
     public function __construct(string $resellerId, string $apiKey, bool $testMode = false, int $timeout = 30)
     {
         $this->resellerId = trim($resellerId);
@@ -56,10 +65,11 @@ class Client
         $this->logger = $logger;
     }
 
-    /** Test seam: replaces the cURL transport. */
+    /** Test seam: replaces the cURL transport (and drops the retry delay). */
     public function setTransport(?callable $transport): void
     {
-        $this->transport = $transport;
+        $this->transport  = $transport;
+        $this->retryDelay = $transport ? 0 : 750000;
     }
 
     public function baseUrl(): string
@@ -287,13 +297,24 @@ class Client
 
         $action = $method . ' ' . $path;
 
-        try {
-            list($status, $raw) = $this->transport
-                ? call_user_func($this->transport, $method, $url, $headers, $payload)
-                : $this->curl($method, $url, $headers, $payload);
-        } catch (ApiException $e) {
-            $this->log($action, $query, $body, $e->getMessage());
-            throw $e;
+        // Cloudflare answers 521/522/523/525/526 when it could not reach the gateway at all
+        // (seen intermittently on OTE from some networks). The request never arrived, so it
+        // is safe to send again - for writes too.
+        $attempt = 0;
+        while (true) {
+            try {
+                list($status, $raw) = $this->transport
+                    ? call_user_func($this->transport, $method, $url, $headers, $payload)
+                    : $this->curl($method, $url, $headers, $payload);
+            } catch (ApiException $e) {
+                $this->log($action, $query, $body, $e->getMessage());
+                throw $e;
+            }
+
+            if (!in_array((int) $status, self::UNREACHED, true) || $attempt >= self::RETRIES) break;
+            $this->log($action, $query, $body, 'HTTP ' . $status . ' (gateway not reached), retrying');
+            $attempt++;
+            if ($this->retryDelay > 0) usleep($this->retryDelay * $attempt);
         }
 
         $decoded = $raw === '' ? [] : json_decode($raw, true);
@@ -364,7 +385,9 @@ class Client
                 case 401: $message = 'The SSL gateway rejected the Reseller ID / API Key.'; break;
                 case 403: $message = 'This reseller account is not allowed to use the SSL gateway.'; break;
                 case 404: $message = 'The SSL gateway could not find the requested certificate.'; break;
-                default:  $message = 'The SSL gateway answered HTTP ' . $status . '.';
+                case 521: case 522: case 523: case 525: case 526:
+                $message = 'The SSL gateway could not be reached (HTTP ' . $status . '). Try again in a moment.'; break;
+            default:  $message = 'The SSL gateway answered HTTP ' . $status . '.';
             }
         }
 
