@@ -59,8 +59,10 @@ function dnassl_ConfigOptions()
             'SimpleMode'  => true,
             'Description' => dnassl_t('cfg_reseller_desc'),
         ],
+        // Plain text on purpose: as a password field next to a text field, browsers take
+        // the pair for a login form and autofill the admin's saved WHMCS password into it.
         'API Key' => [
-            'Type'        => 'password',
+            'Type'        => 'text',
             'Size'        => '40',
             'SimpleMode'  => true,
             'Description' => dnassl_t('cfg_key_desc'),
