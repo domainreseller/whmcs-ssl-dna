@@ -29,7 +29,7 @@ and unpack it into the WHMCS root; it creates `modules/servers/dnassl`.
 ## ✨ What it does
 
 - Opens the certificate order at Domain Name API when the service is activated
-- No server record: Reseller ID and API Key go on the product, live or test detected from the key
+- No server record: Reseller ID, API Key and Test Mode are product settings
 - Fills the product's **Certificate** list live from your Domain Name API catalogue, with your reseller cost
 - Client area: paste a CSR or let the module generate one (private key downloadable afterwards)
 - E-mail, HTTP file or DNS (CNAME) domain validation, with the exact file / record to publish
@@ -53,8 +53,10 @@ and unpack it into the WHMCS root; it creates `modules/servers/dnassl`.
    |---|---|
    | Module Name | `DNA SSL Certificates` |
    | Reseller ID | your **Reseller ID** |
-   | API Key | your **API Key** — live or test, the module detects which |
+   | API Key | your **API Key** |
+   | Test Mode | tick it when the key is a **test** key (OTE test environment) |
 
+   Check that the browser did not autofill your WHMCS login into Reseller ID / API Key.
    **Save Changes**: the **Certificate** list then loads from your Domain Name API
    catalogue with your reseller cost. Pick the certificate, optionally tick **Revoke on
    Termination**, and save again. No server or server group is needed.

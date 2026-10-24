@@ -79,7 +79,7 @@ namespace {
                 : [401, 'Unauthorized! Invalid API Key.'];
         }
         // Everything else must go to the environment the key belongs to.
-        if ($host !== 'ote.domainresellerapi.com') return [401, 'Unauthorized! Invalid API Key.'];
+        if ($host !== 'ote.domainresellerapi.com' || !in_array('X-API-KEY: TOPSECRETKEY', $headers, true)) return [401, 'Unauthorized! Invalid API Key.'];
         $b = $body ? json_decode($body, true) : [];
         $j = function ($d, $s = 200) { return [$s, json_encode($d)]; };
         switch ($method . ' ' . $path) {
@@ -124,7 +124,7 @@ namespace {
 
     $params = [
         'serviceid' => 7, 'domain' => 'Shop.Example.com',
-        'configoption1' => 'reseller-uuid', 'configoption2' => 'TOPSECRETKEY', 'configoption3' => 'UCC', 'configoption4' => 'on',
+        'configoption1' => 'reseller-uuid', 'configoption2' => 'TOPSECRETKEY', 'configoption3' => 'on', 'configoption4' => 'UCC', 'configoption5' => 'on',
         'clientsdetails' => ['firstname' => 'Ada', 'lastname' => 'Lovelace', 'fullname' => 'Ada Lovelace', 'companyname' => '', 'email' => 'ada@example.com',
             'address1' => 'Street 1', 'address2' => '', 'city' => 'Istanbul', 'state' => 'IST', 'postcode' => '34000', 'countrycode' => 'TR',
             'phonecc' => '90', 'phonenumber' => '+90.5321234567'],
@@ -133,14 +133,16 @@ namespace {
     echo "== definition\n";
     check('metadata: no server needed', dnassl_MetaData()['RequiresServer'] === false);
     $co = array_keys(dnassl_ConfigOptions());
-    check('settings order', $co === ['Reseller ID', 'API Key', 'Certificate', 'Revoke on Termination'], json_encode($co));
+    check('settings order', $co === ['Reseller ID', 'API Key', 'Test Mode', 'Certificate', 'Revoke on Termination'], json_encode($co));
     try { dnassl_PackageLoader(['configoption1' => '', 'configoption2' => '']); check('loader asks for credentials', false); }
     catch (\Exception $e) { check('loader asks for credentials', $e->getMessage() === dnassl_t('cfg_need_credentials')); }
-    try { dnassl_PackageLoader(['configoption1' => 'x', 'configoption2' => 'wrong']); check('loader rejects wrong key', false); }
-    catch (\Exception $e) { check('loader rejects wrong key', $e->getMessage() === dnassl_t('err_credentials')); }
+    try { dnassl_PackageLoader(['configoption1' => 'x', 'configoption2' => 'wrong', 'configoption3' => 'on']); check('loader rejects wrong key', false); }
+    catch (\Exception $e) { check('loader rejects wrong key', $e->getMessage() === dnassl_t('err_credentials'), $e->getMessage()); }
+    try { dnassl_PackageLoader(['configoption3' => ''] + $params); check('loader: test key with Test Mode off is explained', false); }
+    catch (\Exception $e) { check('loader: test key with Test Mode off is explained', $e->getMessage() === dnassl_t('err_key_is_test'), $e->getMessage()); }
+    check('API key is a password field', dnassl_ConfigOptions()['API Key']['Type'] === 'password');
     $opts = dnassl_PackageLoader($params);
     check('package loader', isset($opts['RAPID'], $opts['UCC']) && strpos($opts['UCC'], 'SAN 2') !== false, json_encode($opts));
-    check('test key detected and cached', in_array('test', \WHMCS\Config\Setting::$values, true));
 
     echo "== create\n";
     check('create', dnassl_CreateAccount($params) === 'success');
@@ -195,11 +197,11 @@ namespace {
     check('terminate survives unrevokable package', dnassl_TerminateAccount($params) === 'success');
     check('admin revoke reports unrevokable package', dnassl_revoke($params) === 'Package is not supported');
     $state['revokeUnsupported'] = false;
-    check('terminate no-op when disabled', dnassl_TerminateAccount(['configoption4' => ''] + $params) === 'success' && $state['revoked'] === 1);
+    check('terminate no-op when disabled', dnassl_TerminateAccount(['configoption5' => ''] + $params) === 'success' && $state['revoked'] === 1);
 
     echo "== logging\n";
     $flat = json_encode($logs);
-    check('api key passed for redaction', $logs && $logs[0][3] === ['TOPSECRETKEY']);
+    check('api key passed for redaction', (bool) array_filter($logs, function ($l) { return ($l[3] ?? null) === ['TOPSECRETKEY']; }));
     check('no private key in logs', strpos($flat, 'BEGIN PRIVATE KEY') === false);
 
     // cleanup

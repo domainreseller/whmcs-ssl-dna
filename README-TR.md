@@ -29,7 +29,7 @@ dosyasını indirip WHMCS kök dizinine açın; `modules/servers/dnassl` klasör
 ## ✨ Neler yapar
 
 - Hizmet aktive edildiğinde sertifika siparişini Domain Name API'de açar
-- Sunucu kaydı yok: Bayi ID ve API Anahtarı üründe girilir, canlı/test anahtardan anlaşılır
+- Sunucu kaydı yok: Bayi ID, API Anahtarı ve Test Mode ürün ayarlarıdır
 - Üründeki **Certificate** listesini Domain Name API kataloğunuzdan, bayi maliyetinizle canlı doldurur
 - Müşteri paneli: CSR yapıştırma ya da modüle oluşturtma (özel anahtar sonradan indirilebilir)
 - E-posta, HTTP dosyası veya DNS (CNAME) doğrulama; yayınlanacak dosya / kayıt birebir gösterilir
@@ -53,9 +53,11 @@ dosyasını indirip WHMCS kök dizinine açın; `modules/servers/dnassl` klasör
    |---|---|
    | Module Name | `DNA SSL Certificates` |
    | Reseller ID | **Bayi ID**'niz |
-   | API Key | **API Anahtarınız** — canlı ya da test, modül hangisi olduğunu anlar |
+   | API Key | **API Anahtarınız** |
+   | Test Mode | anahtar **test** anahtarıysa işaretleyin (OTE test ortamı) |
 
-   **Save Changes**'e basın: **Certificate** listesi Domain Name API kataloğunuzdan bayi
+   Tarayıcının Reseller ID / API Key alanlarına WHMCS giriş bilgilerinizi otomatik
+   doldurmadığını kontrol edin. **Save Changes**'e basın: **Certificate** listesi Domain Name API kataloğunuzdan bayi
    maliyetinizle yüklenir. Sertifikayı seçin, isterseniz **Revoke on Termination**'ı
    işaretleyin ve tekrar kaydedin. Sunucu ya da sunucu grubu gerekmez.
 3. Siparişin ne zaman açılacağını seçin (ör. *ilk ödeme alındığında*).
