@@ -50,10 +50,15 @@ dosyasını indirip WHMCS kök dizinine açın; `modules/servers/dnassl` klasör
 
    | Alan | Değer |
    |---|---|
+   | Name | istediğiniz bir ad, ör. `Domain Name API SSL` |
+   | Hostname | boş bırakın |
    | Module | `DNA SSL Certificates` |
-   | Hostname | `api.domainresellerapi.com` — test ortamı için `ote.domainresellerapi.com` |
    | Username | **Bayi ID**'niz |
-   | Password | **API Anahtarınız** (`ote.` için test anahtarı) |
+   | Password | **API Anahtarınız** — canlı ya da test |
+
+   Modül, anahtarın canlı ortama mı test ortamına mı ait olduğunu kendisi bulur. Belirli bir
+   ortamı zorlamak için hostname'e `api.domainresellerapi.com` (canlı) ya da
+   `ote.domainresellerapi.com` (test) yazın.
 
    **Test Connection** ile deneyin, kaydedin ve sunucuyu bir sunucu grubuna ekleyin.
 3. Bir ürün oluşturun (tür *Other*), **Module Settings** sekmesinde `DNA SSL Certificates`,

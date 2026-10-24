@@ -37,6 +37,15 @@ namespace WHMCS\Database {
     }
 }
 
+namespace WHMCS\Config {
+    class Setting
+    {
+        public static $values = [];
+        public static function getValue($k) { return self::$values[$k] ?? null; }
+        public static function setValue($k, $v) { self::$values[$k] = $v; }
+    }
+}
+
 namespace {
     define('WHMCS', true);
 
@@ -62,7 +71,15 @@ namespace {
     $calls = [];
     $GLOBALS['dnassl_test_transport'] = function ($method, $url, $headers, $body) use (&$state, &$calls) {
         $path = parse_url($url, PHP_URL_PATH);
-        $calls[] = $method . ' ' . $path;
+        $host = parse_url($url, PHP_URL_HOST);
+        $calls[] = $method . ' ' . $host . $path;
+        if ($path === '/api/v1/deposit/accounts/me') {
+            return $host === 'ote.domainresellerapi.com' && in_array('X-API-KEY: TOPSECRETKEY', $headers, true)
+                ? [200, json_encode(['resellerGroupName' => 'Reseller'])]
+                : [401, 'Unauthorized! Invalid API Key.'];
+        }
+        // Everything else must go to the environment the key belongs to.
+        if ($host !== 'ote.domainresellerapi.com') return [401, 'Unauthorized! Invalid API Key.'];
         $b = $body ? json_decode($body, true) : [];
         $j = function ($d, $s = 200) { return [$s, json_encode($d)]; };
         switch ($method . ' ' . $path) {
@@ -107,7 +124,7 @@ namespace {
 
     $params = [
         'serviceid' => 7, 'domain' => 'Shop.Example.com', 'configoption1' => 'UCC', 'configoption2' => 'on',
-        'serverhostname' => 'ote.domainresellerapi.com', 'serverip' => '', 'serverusername' => 'reseller-uuid', 'serverpassword' => 'TOPSECRETKEY',
+        'serverhostname' => '', 'serverip' => '', 'serverusername' => 'reseller-uuid', 'serverpassword' => 'TOPSECRETKEY',
         'clientsdetails' => ['firstname' => 'Ada', 'lastname' => 'Lovelace', 'fullname' => 'Ada Lovelace', 'companyname' => '', 'email' => 'ada@example.com',
             'address1' => 'Street 1', 'address2' => '', 'city' => 'Istanbul', 'state' => 'IST', 'postcode' => '34000', 'countrycode' => 'TR',
             'phonecc' => '90', 'phonenumber' => '+90.5321234567'],
@@ -118,6 +135,10 @@ namespace {
     $opts = dnassl_PackageLoader($params);
     check('package loader', isset($opts['RAPID'], $opts['UCC']) && strpos($opts['UCC'], 'SAN 2') !== false, json_encode($opts));
     check('test connection', dnassl_TestConnection($params)['success'] === true);
+    check('test key detected without hostname, cached', in_array('test', \WHMCS\Config\Setting::$values, true));
+    check('hostname forces live', dnassl_environment(['serverhostname' => 'api.domainresellerapi.com'], 'r', 'k') === 'live');
+    $bad = dnassl_TestConnection(['serverusername' => 'x', 'serverpassword' => 'wrong'] + $params);
+    check('wrong key reported', $bad['success'] === false);
 
     echo "== create\n";
     check('create', dnassl_CreateAccount($params) === 'success');

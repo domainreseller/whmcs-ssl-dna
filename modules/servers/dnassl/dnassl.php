@@ -3,9 +3,9 @@
  * DNA SSL - Domain Name API SSL certificates for WHMCS.
  *
  * Server module. The "server" holds the reseller credentials:
- *   Hostname  api.domainresellerapi.com  (live)  or  ote.domainresellerapi.com  (test)
  *   Username  Reseller ID
- *   Password  API Key
+ *   Password  API Key (live or test - the module finds out which, see dnassl_api())
+ *   Hostname  optional; only needed to force an environment
  *
  * Flow: the order is opened at activation (CreateAccount -> /ssls/initialize); the
  * client then submits CSR, validation method and contact from the client area
@@ -40,6 +40,10 @@ function dnassl_MetaData()
         'DisplayName'    => 'DNA SSL Certificates',
         'APIVersion'     => '1.1',
         'RequiresServer' => true,
+        // The gateway is always HTTPS on 443; these only keep the server form from
+        // suggesting cPanel's 2087.
+        'DefaultSSLPort'    => '443',
+        'DefaultNonSSLPort' => '443',
     ];
 }
 
@@ -94,6 +98,12 @@ function dnassl_PackageLoader(array $params)
 
 function dnassl_TestConnection(array $params)
 {
+    $env = Client::environmentFor((string) $params['serverusername'], (string) $params['serverpassword'],
+        isset($GLOBALS['dnassl_test_transport']) && is_callable($GLOBALS['dnassl_test_transport']) ? $GLOBALS['dnassl_test_transport'] : null);
+    if ($env === '' && strpos(strtolower((string) ($params['serverhostname'] ?? '')), 'ote.') === false) {
+        return ['success' => false, 'error' => 'Neither the live nor the test Domain Name API accepted this Reseller ID / API Key.'];
+    }
+
     try {
         $count = count(dnassl_api($params)->products());
     } catch (ApiException $e) {
@@ -484,16 +494,14 @@ function dnassl_downloadPrivateKey(array $params)
 
 function dnassl_api(array $params): Client
 {
-    $host = strtolower(trim((string) ($params['serverhostname'] ?? '') ?: (string) ($params['serverip'] ?? '')));
-    $test = strpos($host, 'ote') !== false || strpos($host, 'test') !== false;
-
-    $client = new Client((string) $params['serverusername'], (string) $params['serverpassword'], $test);
-    $secret = (string) $params['serverpassword'];
-
+    $reseller  = (string) $params['serverusername'];
+    $secret    = (string) $params['serverpassword'];
     // Test seam for tests/smoke-whmcs.php; never set inside WHMCS.
-    if (isset($GLOBALS['dnassl_test_transport']) && is_callable($GLOBALS['dnassl_test_transport'])) {
-        $client->setTransport($GLOBALS['dnassl_test_transport']);
-    }
+    $transport = isset($GLOBALS['dnassl_test_transport']) && is_callable($GLOBALS['dnassl_test_transport'])
+        ? $GLOBALS['dnassl_test_transport'] : null;
+
+    $client = new Client($reseller, $secret, dnassl_environment($params, $reseller, $secret, $transport) === 'test');
+    if ($transport) $client->setTransport($transport);
 
     $client->setLogger(function ($action, $request, $response) use ($secret) {
         if (function_exists('logModuleCall')) {
@@ -502,6 +510,36 @@ function dnassl_api(array $params): Client
     });
 
     return $client;
+}
+
+/**
+ * 'live' or 'test' for the server's key.
+ *
+ * A hostname naming one environment (ote.domainresellerapi.com / api.domainresellerapi.com)
+ * decides it outright. Otherwise the key is tried against the gateways once and the answer
+ * kept in tblconfiguration, keyed by a hash of the credentials, so changing the key on the
+ * server record re-detects it. Undetectable (gateway unreachable) means live, not cached.
+ */
+function dnassl_environment(array $params, string $reseller, string $secret, ?callable $transport = null): string
+{
+    $host = strtolower(trim((string) ($params['serverhostname'] ?? '')));
+    if (strpos($host, 'ote.') !== false || strpos($host, 'test') !== false) return 'test';
+    if (strpos($host, 'api.') !== false) return 'live';
+
+    static $memo = [];
+    $hash = substr(hash('sha256', $reseller . '|' . $secret), 0, 16);
+    if (isset($memo[$hash])) return $memo[$hash];
+
+    $setting = 'DnaSslEnv' . $hash;
+    $stored  = class_exists('\\WHMCS\\Config\\Setting') ? (string) \WHMCS\Config\Setting::getValue($setting) : '';
+    if ($stored === 'live' || $stored === 'test') return $memo[$hash] = $stored;
+
+    $env = ($reseller !== '' && $secret !== '') ? Client::environmentFor($reseller, $secret, $transport) : '';
+    if ($env === '') return 'live';
+
+    if (class_exists('\\WHMCS\\Config\\Setting')) \WHMCS\Config\Setting::setValue($setting, $env);
+
+    return $memo[$hash] = $env;
 }
 
 function dnassl_configureInput(array $params, array $row): array

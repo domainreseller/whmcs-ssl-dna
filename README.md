@@ -50,10 +50,15 @@ and unpack it into the WHMCS root; it creates `modules/servers/dnassl`.
 
    | Field | Value |
    |---|---|
+   | Name | anything, e.g. `Domain Name API SSL` |
+   | Hostname | leave empty |
    | Module | `DNA SSL Certificates` |
-   | Hostname | `api.domainresellerapi.com` — or `ote.domainresellerapi.com` for the test environment |
    | Username | your **Reseller ID** |
-   | Password | your **API Key** (the test key on `ote.`) |
+   | Password | your **API Key** — live or test |
+
+   The module finds out whether the key belongs to the live or the test environment by
+   itself. To force one, enter `api.domainresellerapi.com` (live) or
+   `ote.domainresellerapi.com` (test) as the hostname.
 
    **Test Connection**, then save and put the server in a server group.
 3. Create a product (type *Other*), open **Module Settings**, choose `DNA SSL Certificates`,

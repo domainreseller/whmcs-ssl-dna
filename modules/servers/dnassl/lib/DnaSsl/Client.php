@@ -67,6 +67,31 @@ class Client
         return $this->baseUrl;
     }
 
+    /**
+     * Which gateway a key belongs to: 'live', 'test' or '' when neither answered.
+     *
+     * Live and test keys are different and each gateway answers the other's key with
+     * HTTP 401 (verified 2026-10-24), so one cheap read on each tells them apart and the
+     * admin does not have to say which environment a key is for.
+     */
+    public static function environmentFor(string $resellerId, string $apiKey, ?callable $transport = null): string
+    {
+        foreach (['live' => false, 'test' => true] as $env => $testMode) {
+            $probe = new self($resellerId, $apiKey, $testMode, 15);
+            if ($transport) $probe->setTransport($transport);
+
+            try {
+                $probe->account();
+                return $env;
+            } catch (ApiException $e) {
+                // 401/403 = not this environment's key; anything else = cannot tell.
+                if (!in_array($e->httpStatus(), [401, 403], true)) return '';
+            }
+        }
+
+        return '';
+    }
+
     // ------------------------------------------------------------------
     // Catalogue
     // ------------------------------------------------------------------
