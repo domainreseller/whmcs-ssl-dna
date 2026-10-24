@@ -1,0 +1,25 @@
+{
+    "schema": "1.0",
+    "type": "whmcs-servers",
+    "name": "dnassl",
+    "license": "CC0-1.0",
+    "category": "ssl",
+    "description": {
+        "name": "DNA SSL Certificates",
+        "tagline": "Sell Domain Name API SSL certificates with automated ordering, validation and delivery.",
+        "long": "Sells the DV, OV, EV, wildcard and multi-domain SSL certificates of your Domain Name API reseller account. Orders open automatically on activation; clients submit or generate their CSR, pick e-mail, HTTP or DNS validation, follow the validation instructions and download the issued certificate from the client area.",
+        "features": [
+            "Automatic order on activation, renewal as a new order",
+            "CSR paste or generation, with private key download",
+            "E-mail, HTTP file and DNS (CNAME) domain validation",
+            "Certificate download and reissue from the client area",
+            "Optional revoke on termination"
+        ]
+    },
+    "authors": [
+        {
+            "name": "Domain Name API",
+            "homepage": "https:\/\/www.domainnameapi.com\/"
+        }
+    ]
+}
