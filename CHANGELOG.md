@@ -17,3 +17,7 @@ First release.
 - CSR common name checked against the ordered domain before it is submitted; approver
   e-mail limited to the gateway's list or a mailbox on the certificate domain.
 - API key and private keys masked in every log line; TLS verified on every request.
+- Requests Cloudflare could not deliver to the gateway (521/522/523/525/526) are retried.
+- Every admin and client label comes from the language files (English and Turkish); admin
+  pages follow the admin's language, the client area the client's.
+- Key size and signature algorithm read from the certificate or CSR.
