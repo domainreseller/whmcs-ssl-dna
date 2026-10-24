@@ -151,8 +151,8 @@ namespace {
 
     echo "== client area\n";
     $ca = dnassl_ClientArea($params);
-    check('client area awaiting', $ca['vars']['status'] === 'awaiting_configuration' && $ca['vars']['approvers'][0] === 'admin@shop.example.com');
-    check('client area max SANs (CN excluded)', $ca['vars']['maxSans'] === 2);
+    check('client area awaiting', $ca['vars']['dnaStatus'] === 'awaiting_configuration' && $ca['vars']['dnaApprovers'][0] === 'admin@shop.example.com');
+    check('client area max SANs (CN excluded)', $ca['vars']['dnaMaxSans'] === 2);
 
     echo "== configure\n";
     $_POST = ['token' => 'bad', 'csr' => 'x'];
@@ -173,14 +173,14 @@ namespace {
     check('status processing', DnaSsl_Store::get(7)['status'] === 'processing' && DnaSsl_Store::get(7)['configured']);
 
     $ca = dnassl_ClientArea($params);
-    check('dcv dns shown', $ca['vars']['status'] === 'processing' && $ca['vars']['dcv']['dns']['value'] === 'y.sectigo.com');
+    check('dcv dns shown', $ca['vars']['dnaStatus'] === 'processing' && $ca['vars']['dnaDcv']['dns']['value'] === 'y.sectigo.com');
 
     echo "== issued\n";
     $state['issued'] = true;
     $_POST = ['token' => 'tok'];
     check('refresh', dnassl_refreshStatus($params) === 'success' && DnaSsl_Store::get(7)['status'] === 'active');
     $ca = dnassl_ClientArea($params);
-    check('client area active, key available', $ca['vars']['status'] === 'active' && $ca['vars']['hasKey'] === true);
+    check('client area active, key available', $ca['vars']['dnaStatus'] === 'active' && $ca['vars']['dnaHasKey'] === true);
     check('admin fields', strpos(implode(' ', dnassl_AdminServicesTabFields($params)), 'c0ffee-1') !== false);
 
     $_POST = ['token' => 'tok', 'csr' => "-----BEGIN CERTIFICATE REQUEST-----\nNEW\n-----END CERTIFICATE REQUEST-----", 'approver' => 'evil@attacker.test'];

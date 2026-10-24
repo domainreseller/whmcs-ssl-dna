@@ -319,7 +319,8 @@ function dnassl_ClientArea(array $params)
         'row'         => $row,
         'status'      => $row ? ($row['status'] ?: 'processing') : 'none',
         'error'       => '',
-        'detail'      => [],
+        'issuedAt'    => '',
+        'validUntil'  => '',
         'dcv'         => ['file' => [], 'dns' => [], 'email' => '', 'raw' => ''],
         'approverShown' => (string) ($row['approver'] ?? ''),
         'approvers'   => [],
@@ -331,14 +332,15 @@ function dnassl_ClientArea(array $params)
     ];
 
     if (!$row || empty($row['domain'])) {
-        return ['templatefile' => 'templates/clientarea', 'vars' => $vars];
+        return ['templatefile' => 'templates/clientarea', 'vars' => dnassl_tplVars($vars)];
     }
 
     $api = dnassl_api($params);
 
     try {
         $detail          = $api->certificate($row['domain']);
-        $vars['detail']  = $detail;
+        $vars['issuedAt']   = substr((string) ($detail['certificate']['issuedAt'] ?? ''), 0, 10);
+        $vars['validUntil'] = substr((string) ($detail['certificate']['validUntil'] ?? ($detail['subscription']['expiresAt'] ?? '')), 0, 10);
         $vars['status']  = Normalizer::status($detail);
         $conf            = (array) ($detail['configuration'] ?? []);
         $vars['dcv']     = Normalizer::dcv((string) ($conf['dcvDetails'] ?? ''), (string) ($conf['authenticationType'] ?? ''), (string) ($row['csr'] ?? ''), $row['domain']);
@@ -366,7 +368,20 @@ function dnassl_ClientArea(array $params)
 
     $vars['maxSans'] = dnassl_maxSans($params, (string) $row['package']);
 
-    return ['templatefile' => 'templates/clientarea', 'vars' => $vars];
+    return ['templatefile' => 'templates/clientarea', 'vars' => dnassl_tplVars($vars)];
+}
+
+/**
+ * Template variables, prefixed: the product details page already defines $status,
+ * $domain, $client, $serviceid, $token... and a module template that reuses those names
+ * overwrites them (or trips over WHMCS's types for them).
+ */
+function dnassl_tplVars(array $vars): array
+{
+    $out = [];
+    foreach ($vars as $k => $v) $out['dna' . ucfirst($k)] = $v;
+
+    return $out;
 }
 
 /** Client submits CSR (or asks us to generate one), DCV method and approver. */
