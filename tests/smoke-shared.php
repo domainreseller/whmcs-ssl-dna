@@ -188,6 +188,13 @@ check('sanList clean', N::sanList("b.com\nA.com, a.com;bad_domain *.c.com exampl
 check('sanList limit', N::sanList('a.com b.com c.com', '', 2) === ['a.com', 'b.com']);
 check('domain normalised', N::domain(' Example.COM. ') === 'example.com');
 if (function_exists('idn_to_ascii')) check('domain idn', N::domain('örnek.com') === 'xn--rnek-4qa.com');
+check('key size from CSR', N::keyInfo('', $csr)['bits'] === 2048);
+check('key size unreadable', N::keyInfo('garbage', 'garbage') === ['bits' => 0, 'signature' => '']);
+$pk = openssl_pkey_new(['private_key_bits' => 2048, 'private_key_type' => OPENSSL_KEYTYPE_RSA]);
+$x509 = openssl_csr_sign(openssl_csr_new(['commonName' => 'x.test'], $pk), null, $pk, 1, ['digest_alg' => 'sha256']);
+openssl_x509_export($x509, $crtPem);
+$ki = N::keyInfo($crtPem, '');
+check('key size + signature from certificate', $ki['bits'] === 2048 && stripos($ki['signature'], 'sha256') !== false, json_encode($ki));
 check('pem split', N::pem(['certificate' => 'C', 'intermediateCertificate1' => 'I1', 'intermediateCertificate2' => '', 'rootCertificate' => 'R']) === ['C', "I1\nR"]);
 
 echo "\n$ok passed, $fail failed\n";

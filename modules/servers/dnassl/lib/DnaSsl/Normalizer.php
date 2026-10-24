@@ -413,6 +413,44 @@ class Normalizer
         return $limit > 0 ? array_slice($out, 0, $limit) : $out;
     }
 
+    /**
+     * Public key size and signature algorithm of a PEM certificate or CSR.
+     *
+     * Prefers the issued certificate (it is what is actually deployed), falls back to the
+     * CSR. Returns ['bits' => 0, 'signature' => ''] for anything unreadable, or when the
+     * openssl extension is missing.
+     *
+     * @return array{bits:int,signature:string}
+     */
+    public static function keyInfo(string $certificate, string $csr = ''): array
+    {
+        $out = ['bits' => 0, 'signature' => ''];
+        if (!function_exists('openssl_pkey_get_details')) return $out;
+
+        $certificate = trim($certificate);
+        if ($certificate !== '' && strpos($certificate, 'BEGIN CERTIFICATE') !== false) {
+            $key = @openssl_pkey_get_public($certificate);
+            if ($key) {
+                $details     = openssl_pkey_get_details($key);
+                $out['bits'] = (int) ($details['bits'] ?? 0);
+            }
+            $parsed = @openssl_x509_parse($certificate);
+            if (is_array($parsed)) $out['signature'] = (string) ($parsed['signatureTypeSN'] ?? '');
+            if ($out['bits'] > 0) return $out;
+        }
+
+        $csr = trim($csr);
+        if ($csr !== '' && strpos($csr, 'CERTIFICATE REQUEST') !== false) {
+            $key = @openssl_csr_get_public_key($csr);
+            if ($key) {
+                $details     = openssl_pkey_get_details($key);
+                $out['bits'] = (int) ($details['bits'] ?? 0);
+            }
+        }
+
+        return $out;
+    }
+
     /** The PEM bundle pieces from certificate-content: [certificate, ca-bundle]. */
     public static function pem(array $content): array
     {
