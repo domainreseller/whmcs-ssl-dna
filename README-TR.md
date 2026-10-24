@@ -29,6 +29,7 @@ dosyasını indirip WHMCS kök dizinine açın; `modules/servers/dnassl` klasör
 ## ✨ Neler yapar
 
 - Hizmet aktive edildiğinde sertifika siparişini Domain Name API'de açar
+- Sunucu kaydı yok: Bayi ID ve API Anahtarı üründe girilir, canlı/test anahtardan anlaşılır
 - Üründeki **Certificate** listesini Domain Name API kataloğunuzdan, bayi maliyetinizle canlı doldurur
 - Müşteri paneli: CSR yapıştırma ya da modüle oluşturtma (özel anahtar sonradan indirilebilir)
 - E-posta, HTTP dosyası veya DNS (CNAME) doğrulama; yayınlanacak dosya / kayıt birebir gösterilir
@@ -46,23 +47,18 @@ dosyasını indirip WHMCS kök dizinine açın; `modules/servers/dnassl` klasör
 ## 🚀 Kurulum
 
 1. `DNASSL-WHMCS.zip` dosyasını WHMCS kök dizinine açın.
-2. **System Settings → Servers → Add New Server**
+2. Bir ürün oluşturun (tür *Other*) ve **Module Settings** sekmesini açın:
 
-   | Alan | Değer |
+   | Ayar | Değer |
    |---|---|
-   | Name | istediğiniz bir ad, ör. `Domain Name API SSL` |
-   | Hostname | boş bırakın |
-   | Module | `DNA SSL Certificates` |
-   | Username | **Bayi ID**'niz |
-   | Password | **API Anahtarınız** — canlı ya da test |
+   | Module Name | `DNA SSL Certificates` |
+   | Reseller ID | **Bayi ID**'niz |
+   | API Key | **API Anahtarınız** — canlı ya da test, modül hangisi olduğunu anlar |
 
-   Modül, anahtarın canlı ortama mı test ortamına mı ait olduğunu kendisi bulur. Belirli bir
-   ortamı zorlamak için hostname'e `api.domainresellerapi.com` (canlı) ya da
-   `ote.domainresellerapi.com` (test) yazın.
-
-   **Test Connection** ile deneyin, kaydedin ve sunucuyu bir sunucu grubuna ekleyin.
-3. Bir ürün oluşturun (tür *Other*), **Module Settings** sekmesinde `DNA SSL Certificates`,
-   sunucu grubunu ve **Certificate** alanını seçin. İsterseniz **Revoke on Termination**'ı işaretleyin.
+   **Save Changes**'e basın: **Certificate** listesi Domain Name API kataloğunuzdan bayi
+   maliyetinizle yüklenir. Sertifikayı seçin, isterseniz **Revoke on Termination**'ı
+   işaretleyin ve tekrar kaydedin. Sunucu ya da sunucu grubu gerekmez.
+3. Siparişin ne zaman açılacağını seçin (ör. *ilk ödeme alındığında*).
 4. Sipariş formunun **alan adı** istediğinden emin olun: sertifika bu alan adı için düzenlenir.
 
 Ödemeden sonra sipariş Domain Name API'de açılır. Müşteri, müşteri panelinde hizmeti açar,

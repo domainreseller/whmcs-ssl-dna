@@ -29,6 +29,7 @@ and unpack it into the WHMCS root; it creates `modules/servers/dnassl`.
 ## ✨ What it does
 
 - Opens the certificate order at Domain Name API when the service is activated
+- No server record: Reseller ID and API Key go on the product, live or test detected from the key
 - Fills the product's **Certificate** list live from your Domain Name API catalogue, with your reseller cost
 - Client area: paste a CSR or let the module generate one (private key downloadable afterwards)
 - E-mail, HTTP file or DNS (CNAME) domain validation, with the exact file / record to publish
@@ -46,23 +47,18 @@ and unpack it into the WHMCS root; it creates `modules/servers/dnassl`.
 ## 🚀 Installation
 
 1. Unpack `DNASSL-WHMCS.zip` into the WHMCS root.
-2. **System Settings → Servers → Add New Server**
+2. Create a product (type *Other*) and open **Module Settings**:
 
-   | Field | Value |
+   | Setting | Value |
    |---|---|
-   | Name | anything, e.g. `Domain Name API SSL` |
-   | Hostname | leave empty |
-   | Module | `DNA SSL Certificates` |
-   | Username | your **Reseller ID** |
-   | Password | your **API Key** — live or test |
+   | Module Name | `DNA SSL Certificates` |
+   | Reseller ID | your **Reseller ID** |
+   | API Key | your **API Key** — live or test, the module detects which |
 
-   The module finds out whether the key belongs to the live or the test environment by
-   itself. To force one, enter `api.domainresellerapi.com` (live) or
-   `ote.domainresellerapi.com` (test) as the hostname.
-
-   **Test Connection**, then save and put the server in a server group.
-3. Create a product (type *Other*), open **Module Settings**, choose `DNA SSL Certificates`,
-   the server group and the **Certificate**. Optionally tick **Revoke on Termination**.
+   **Save Changes**: the **Certificate** list then loads from your Domain Name API
+   catalogue with your reseller cost. Pick the certificate, optionally tick **Revoke on
+   Termination**, and save again. No server or server group is needed.
+3. Choose when the order is opened (for example *as soon as the first payment is received*).
 4. Make sure the order form asks for a **domain**: the certificate is issued for it.
 
 After payment the order is opened at Domain Name API. The client opens the service in the

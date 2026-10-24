@@ -2,10 +2,9 @@
 /**
  * DNA SSL - Domain Name API SSL certificates for WHMCS.
  *
- * Server module. The "server" holds the reseller credentials:
- *   Username  Reseller ID
- *   Password  API Key (live or test - the module finds out which, see dnassl_api())
- *   Hostname  optional; only needed to force an environment
+ * Provisioning module without a server: the Domain Name API credentials are entered on
+ * the product's Module Settings tab (Reseller ID + API Key). Live or test is worked out
+ * from the key itself, see dnassl_environment().
  *
  * Flow: the order is opened at activation (CreateAccount -> /ssls/initialize); the
  * client then submits CSR, validation method and contact from the client area
@@ -39,23 +38,33 @@ function dnassl_MetaData()
     return [
         'DisplayName'    => 'DNA SSL Certificates',
         'APIVersion'     => '1.1',
-        'RequiresServer' => true,
-        // The gateway is always HTTPS on 443; these only keep the server form from
-        // suggesting cPanel's 2087.
-        'DefaultSSLPort'    => '443',
-        'DefaultNonSSLPort' => '443',
+        'RequiresServer' => false,
     ];
 }
 
 /**
  * Product settings. Bound to configoption1..N by position: only ever append.
  *
- *   1  Certificate package (gateway productCode)
- *   2  Revoke on termination (yes/no)
+ *   1  Reseller ID
+ *   2  API Key (live or test)
+ *   3  Certificate package (gateway productCode)
+ *   4  Revoke on termination (yes/no)
  */
 function dnassl_ConfigOptions()
 {
     return [
+        'Reseller ID' => [
+            'Type'        => 'text',
+            'Size'        => '40',
+            'SimpleMode'  => true,
+            'Description' => dnassl_t('cfg_reseller_desc'),
+        ],
+        'API Key' => [
+            'Type'        => 'password',
+            'Size'        => '40',
+            'SimpleMode'  => true,
+            'Description' => dnassl_t('cfg_key_desc'),
+        ],
         'Certificate' => [
             'Type'        => 'dropdown',
             'Loader'      => 'dnassl_PackageLoader',
@@ -73,11 +82,18 @@ function dnassl_ConfigOptions()
 /** Fills the Certificate dropdown from the gateway catalogue. */
 function dnassl_PackageLoader(array $params)
 {
+    $params = dnassl_withProductCredentials($params);
+    if (trim((string) ($params['configoption1'] ?? '')) === '' || trim((string) ($params['configoption2'] ?? '')) === '') {
+        throw new \Exception(dnassl_t('cfg_need_credentials'));
+    }
+    if (dnassl_environment($params) === '') {
+        throw new \Exception(dnassl_t('err_credentials'));
+    }
+
     $options = [];
     try {
         $api = dnassl_api($params);
         foreach (Normalizer::catalogue($api->products(), $api->priceGroup()) as $p) {
-
             $price = $p['prices'] ? sprintf(' - %.2f %s', $p['prices'][0]['cost'], $p['currency']) : '';
             $options[$p['code']] = sprintf('%s [%s%s%s]%s',
                 $p['name'],
@@ -96,23 +112,25 @@ function dnassl_PackageLoader(array $params)
     return $options;
 }
 
-function dnassl_TestConnection(array $params)
+/**
+ * The loader runs on the product edit page, where WHMCS may not hand over the saved
+ * module settings; read them from the product being edited when they are missing.
+ */
+function dnassl_withProductCredentials(array $params): array
 {
-    $env = Client::environmentFor((string) $params['serverusername'], (string) $params['serverpassword'],
-        isset($GLOBALS['dnassl_test_transport']) && is_callable($GLOBALS['dnassl_test_transport']) ? $GLOBALS['dnassl_test_transport'] : null);
-    if ($env === '' && strpos(strtolower((string) ($params['serverhostname'] ?? '')), 'ote.') === false) {
-        return ['success' => false, 'error' => 'Neither the live nor the test Domain Name API accepted this Reseller ID / API Key.'];
+    if (!empty($params['configoption1']) && !empty($params['configoption2'])) return $params;
+
+    $pid = (int) ($params['pid'] ?? $params['packageid'] ?? ($_REQUEST['id'] ?? 0));
+    if ($pid <= 0 || !class_exists('\\WHMCS\\Database\\Capsule')) return $params;
+
+    $product = \WHMCS\Database\Capsule::table('tblproducts')->where('id', $pid)->where('servertype', 'dnassl')
+        ->first(['configoption1', 'configoption2']);
+    if ($product) {
+        $params['configoption1'] = (string) ($params['configoption1'] ?? '') ?: (string) $product->configoption1;
+        $params['configoption2'] = (string) ($params['configoption2'] ?? '') ?: (string) $product->configoption2;
     }
 
-    try {
-        $count = count(dnassl_api($params)->products());
-    } catch (ApiException $e) {
-        return ['success' => false, 'error' => $e->getMessage()];
-    }
-
-    return $count > 0
-        ? ['success' => true, 'error' => '']
-        : ['success' => false, 'error' => 'Connected, but this reseller account has no SSL products.'];
+    return $params;
 }
 
 // ---------------------------------------------------------------------------
@@ -125,7 +143,7 @@ function dnassl_CreateAccount(array $params)
     $row       = DnaSsl_Store::get($serviceId);
     if (!empty($row['certificate_id'])) return 'success';
 
-    $package = trim((string) $params['configoption1']);
+    $package = trim((string) $params['configoption3']);
     $domain  = Normalizer::domain((string) $params['domain']);
 
     if ($package === '') return dnassl_t('err_no_package');
@@ -158,7 +176,7 @@ function dnassl_Renew(array $params)
     $serviceId = (int) $params['serviceid'];
     $row       = DnaSsl_Store::get($serviceId);
     $domain    = (string) ($row['domain'] ?? '') ?: Normalizer::domain((string) $params['domain']);
-    $package   = (string) ($row['package'] ?? '') ?: trim((string) $params['configoption1']);
+    $package   = (string) ($row['package'] ?? '') ?: trim((string) $params['configoption3']);
 
     if ($domain === '' || $package === '') return dnassl_t('err_no_domain');
 
@@ -206,7 +224,7 @@ function dnassl_UnsuspendAccount(array $params)
 function dnassl_TerminateAccount(array $params)
 {
     $row = DnaSsl_Store::get((int) $params['serviceid']);
-    if (empty($row['certificate_id']) || $params['configoption2'] !== 'on') return 'success';
+    if (empty($row['certificate_id']) || $params['configoption4'] !== 'on') return 'success';
 
     // Termination must not stall on a package that cannot be revoked (Ssl:10003).
     return dnassl_revoke($params, true);
@@ -494,13 +512,11 @@ function dnassl_downloadPrivateKey(array $params)
 
 function dnassl_api(array $params): Client
 {
-    $reseller  = (string) $params['serverusername'];
-    $secret    = (string) $params['serverpassword'];
-    // Test seam for tests/smoke-whmcs.php; never set inside WHMCS.
-    $transport = isset($GLOBALS['dnassl_test_transport']) && is_callable($GLOBALS['dnassl_test_transport'])
-        ? $GLOBALS['dnassl_test_transport'] : null;
+    $reseller  = trim((string) ($params['configoption1'] ?? ''));
+    $secret    = trim((string) ($params['configoption2'] ?? ''));
+    $transport = dnassl_transport();
 
-    $client = new Client($reseller, $secret, dnassl_environment($params, $reseller, $secret, $transport) === 'test');
+    $client = new Client($reseller, $secret, dnassl_environment($params) === 'test');
     if ($transport) $client->setTransport($transport);
 
     $client->setLogger(function ($action, $request, $response) use ($secret) {
@@ -512,19 +528,25 @@ function dnassl_api(array $params): Client
     return $client;
 }
 
-/**
- * 'live' or 'test' for the server's key.
- *
- * A hostname naming one environment (ote.domainresellerapi.com / api.domainresellerapi.com)
- * decides it outright. Otherwise the key is tried against the gateways once and the answer
- * kept in tblconfiguration, keyed by a hash of the credentials, so changing the key on the
- * server record re-detects it. Undetectable (gateway unreachable) means live, not cached.
- */
-function dnassl_environment(array $params, string $reseller, string $secret, ?callable $transport = null): string
+/** Test seam for tests/smoke-whmcs.php; never set inside WHMCS. */
+function dnassl_transport(): ?callable
 {
-    $host = strtolower(trim((string) ($params['serverhostname'] ?? '')));
-    if (strpos($host, 'ote.') !== false || strpos($host, 'test') !== false) return 'test';
-    if (strpos($host, 'api.') !== false) return 'live';
+    return isset($GLOBALS['dnassl_test_transport']) && is_callable($GLOBALS['dnassl_test_transport'])
+        ? $GLOBALS['dnassl_test_transport'] : null;
+}
+
+/**
+ * 'live', 'test' or '' (neither gateway accepted the key) for the product's credentials.
+ *
+ * The key is tried against the gateways once and the answer kept in tblconfiguration,
+ * keyed by a hash of the credentials, so changing the key on the product re-detects it.
+ * An unreachable gateway is not cached.
+ */
+function dnassl_environment(array $params): string
+{
+    $reseller = trim((string) ($params['configoption1'] ?? ''));
+    $secret   = trim((string) ($params['configoption2'] ?? ''));
+    if ($reseller === '' || $secret === '') return '';
 
     static $memo = [];
     $hash = substr(hash('sha256', $reseller . '|' . $secret), 0, 16);
@@ -534,10 +556,8 @@ function dnassl_environment(array $params, string $reseller, string $secret, ?ca
     $stored  = class_exists('\\WHMCS\\Config\\Setting') ? (string) \WHMCS\Config\Setting::getValue($setting) : '';
     if ($stored === 'live' || $stored === 'test') return $memo[$hash] = $stored;
 
-    $env = ($reseller !== '' && $secret !== '') ? Client::environmentFor($reseller, $secret, $transport) : '';
-    if ($env === '') return 'live';
-
-    if (class_exists('\\WHMCS\\Config\\Setting')) \WHMCS\Config\Setting::setValue($setting, $env);
+    $env = Client::environmentFor($reseller, $secret, dnassl_transport());
+    if ($env !== '' && class_exists('\\WHMCS\\Config\\Setting')) \WHMCS\Config\Setting::setValue($setting, $env);
 
     return $memo[$hash] = $env;
 }

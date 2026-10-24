@@ -7,8 +7,8 @@ First release.
 - WHMCS server module `dnassl` for Domain Name API SSL certificates.
 - Certificate dropdown filled from the live catalogue, priced from the reseller's price
   group; duplicate product codes collapsed.
-- No hostname needed: the module tells a live key from a test key by itself (a hostname
-  can still force one).
+- No server record: Reseller ID and API Key are product module settings, and the module
+  tells a live key from a test key by itself.
 - Order opened on activation; client-area configuration: paste or generate a CSR, e-mail /
   HTTP file / DNS (CNAME) validation, additional domains up to the package limit.
 - Exact validation file or CNAME record shown, derived from the CSR.

@@ -123,29 +123,31 @@ namespace {
     };
 
     $params = [
-        'serviceid' => 7, 'domain' => 'Shop.Example.com', 'configoption1' => 'UCC', 'configoption2' => 'on',
-        'serverhostname' => '', 'serverip' => '', 'serverusername' => 'reseller-uuid', 'serverpassword' => 'TOPSECRETKEY',
+        'serviceid' => 7, 'domain' => 'Shop.Example.com',
+        'configoption1' => 'reseller-uuid', 'configoption2' => 'TOPSECRETKEY', 'configoption3' => 'UCC', 'configoption4' => 'on',
         'clientsdetails' => ['firstname' => 'Ada', 'lastname' => 'Lovelace', 'fullname' => 'Ada Lovelace', 'companyname' => '', 'email' => 'ada@example.com',
             'address1' => 'Street 1', 'address2' => '', 'city' => 'Istanbul', 'state' => 'IST', 'postcode' => '34000', 'countrycode' => 'TR',
             'phonecc' => '90', 'phonenumber' => '+90.5321234567'],
     ];
 
     echo "== definition\n";
-    check('metadata', dnassl_MetaData()['RequiresServer'] === true);
+    check('metadata: no server needed', dnassl_MetaData()['RequiresServer'] === false);
+    $co = array_keys(dnassl_ConfigOptions());
+    check('settings order', $co === ['Reseller ID', 'API Key', 'Certificate', 'Revoke on Termination'], json_encode($co));
+    try { dnassl_PackageLoader(['configoption1' => '', 'configoption2' => '']); check('loader asks for credentials', false); }
+    catch (\Exception $e) { check('loader asks for credentials', $e->getMessage() === dnassl_t('cfg_need_credentials')); }
+    try { dnassl_PackageLoader(['configoption1' => 'x', 'configoption2' => 'wrong']); check('loader rejects wrong key', false); }
+    catch (\Exception $e) { check('loader rejects wrong key', $e->getMessage() === dnassl_t('err_credentials')); }
     $opts = dnassl_PackageLoader($params);
     check('package loader', isset($opts['RAPID'], $opts['UCC']) && strpos($opts['UCC'], 'SAN 2') !== false, json_encode($opts));
-    check('test connection', dnassl_TestConnection($params)['success'] === true);
-    check('test key detected without hostname, cached', in_array('test', \WHMCS\Config\Setting::$values, true));
-    check('hostname forces live', dnassl_environment(['serverhostname' => 'api.domainresellerapi.com'], 'r', 'k') === 'live');
-    $bad = dnassl_TestConnection(['serverusername' => 'x', 'serverpassword' => 'wrong'] + $params);
-    check('wrong key reported', $bad['success'] === false);
+    check('test key detected and cached', in_array('test', \WHMCS\Config\Setting::$values, true));
 
     echo "== create\n";
     check('create', dnassl_CreateAccount($params) === 'success');
     $row = DnaSsl_Store::get(7);
     check('order stored, domain lower-cased', $row['certificate_id'] === 'c0ffee-1' && $row['domain'] === 'shop.example.com' && $row['status'] === 'awaiting_configuration');
     check('create idempotent', dnassl_CreateAccount($params) === 'success' && $state['initialized'] === 1);
-    check('create needs domain', dnassl_CreateAccount(['serviceid' => 8, 'domain' => '', 'configoption1' => 'UCC'] + $params) === dnassl_t('err_no_domain'));
+    check('create needs domain', dnassl_CreateAccount(['serviceid' => 8, 'domain' => ''] + $params) === dnassl_t('err_no_domain'));
 
     echo "== client area\n";
     $ca = dnassl_ClientArea($params);
@@ -193,7 +195,7 @@ namespace {
     check('terminate survives unrevokable package', dnassl_TerminateAccount($params) === 'success');
     check('admin revoke reports unrevokable package', dnassl_revoke($params) === 'Package is not supported');
     $state['revokeUnsupported'] = false;
-    check('terminate no-op when disabled', dnassl_TerminateAccount(['configoption2' => ''] + $params) === 'success' && $state['revoked'] === 1);
+    check('terminate no-op when disabled', dnassl_TerminateAccount(['configoption4' => ''] + $params) === 'success' && $state['revoked'] === 1);
 
     echo "== logging\n";
     $flat = json_encode($logs);

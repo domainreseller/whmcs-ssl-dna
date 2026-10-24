@@ -1,5 +1,9 @@
 <?php
 return [
+    'cfg_reseller_desc'    => 'Domain Name API Bayi ID\'niz (bayi paneli → API).',
+    'cfg_key_desc'         => 'Canlı veya test API anahtarı; modül hangisi olduğunu kendisi anlar.',
+    'cfg_need_credentials' => 'Bayi ID ve API Anahtarını girip kaydedin, sertifika listesi yüklenir.',
+    'err_credentials'      => 'Bu Bayi ID / API Anahtarını ne canlı ne de test Domain Name API kabul etti.',
     'cfg_package_desc' => 'Bu ürünün sattığı Domain Name API sertifikası.',
     'cfg_revoke_desc'  => 'Hizmet sonlandırıldığında sertifikayı Domain Name API üzerinde iptal et (revoke).',
 

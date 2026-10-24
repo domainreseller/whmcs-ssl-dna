@@ -1,5 +1,9 @@
 <?php
 return [
+    'cfg_reseller_desc'    => 'Your Domain Name API Reseller ID (reseller panel → API).',
+    'cfg_key_desc'         => 'Live or test API Key; the module detects which one it is.',
+    'cfg_need_credentials' => 'Enter the Reseller ID and API Key, save, and the certificate list loads.',
+    'err_credentials'      => 'Neither the live nor the test Domain Name API accepted this Reseller ID / API Key.',
     'cfg_package_desc' => 'The Domain Name API certificate this product sells.',
     'cfg_revoke_desc'  => 'Revoke the certificate at Domain Name API when the service is terminated.',
 
