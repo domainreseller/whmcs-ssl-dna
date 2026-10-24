@@ -55,6 +55,7 @@ function dnassl_ConfigOptions()
 {
     return [
         'Reseller ID' => [
+            'FriendlyName' => dnassl_t('cfg_reseller'),
             'Type'        => 'text',
             'Size'        => '40',
             'SimpleMode'  => true,
@@ -63,23 +64,27 @@ function dnassl_ConfigOptions()
         // Note: browsers may autofill the admin's saved WHMCS login into this pair of
         // fields; the description asks to check it.
         'API Key' => [
+            'FriendlyName' => dnassl_t('cfg_key'),
             'Type'        => 'password',
             'Size'        => '40',
             'SimpleMode'  => true,
             'Description' => dnassl_t('cfg_key_desc'),
         ],
         'Test Mode' => [
+            'FriendlyName' => dnassl_t('cfg_test'),
             'Type'        => 'yesno',
             'SimpleMode'  => true,
             'Description' => dnassl_t('cfg_test_desc'),
         ],
         'Certificate' => [
+            'FriendlyName' => dnassl_t('cfg_package'),
             'Type'        => 'dropdown',
             'Loader'      => 'dnassl_PackageLoader',
             'SimpleMode'  => true,
             'Description' => dnassl_t('cfg_package_desc'),
         ],
         'Revoke on Termination' => [
+            'FriendlyName' => dnassl_t('cfg_revoke'),
             'Type'        => 'yesno',
             'SimpleMode'  => true,
             'Description' => dnassl_t('cfg_revoke_desc'),
@@ -108,8 +113,8 @@ function dnassl_PackageLoader(array $params)
             $options[$p['code']] = sprintf('%s [%s%s%s]%s',
                 $p['name'],
                 $p['type'],
-                $p['wildcard'] ? ', Wildcard' : '',
-                $p['multi_domain'] ? ', SAN ' . $p['max_sans'] : '',
+                $p['wildcard'] ? ', ' . dnassl_t('label_wildcard') : '',
+                $p['multi_domain'] ? ', ' . dnassl_t('label_san') . ' ' . $p['max_sans'] : '',
                 $price
             );
         }
@@ -265,8 +270,8 @@ function dnassl_TerminateAccount(array $params)
 function dnassl_AdminCustomButtonArray()
 {
     return [
-        'Refresh Status'     => 'refresh',
-        'Revoke Certificate' => 'revoke',
+        dnassl_t('btn_refresh') => 'refresh',
+        dnassl_t('btn_revoke')  => 'revoke',
     ];
 }
 
@@ -350,7 +355,7 @@ function dnassl_ClientArea(array $params)
         'dcv'         => ['file' => [], 'dns' => [], 'email' => '', 'raw' => ''],
         'approverShown' => (string) ($row['approver'] ?? ''),
         'approvers'   => [],
-        'webServers'  => Normalizer::WEB_SERVERS,
+        'webServers'  => dnassl_webServers(),
         'client'      => $params['clientsdetails'],
         'hasKey'      => !empty($row['private_key']),
         'maxSans'     => 0,
@@ -700,8 +705,10 @@ function dnassl_lang(): array
     if ($lang !== null) return $lang;
 
     $lang     = include __DIR__ . '/lang/english.php';
+    // Admin pages follow the admin's language, the client area the client's.
     $selected = '';
-    if (isset($_SESSION['Language'])) $selected = (string) $_SESSION['Language'];
+    if (defined('ADMINAREA') && !empty($_SESSION['adminlang'])) $selected = (string) $_SESSION['adminlang'];
+    elseif (!defined('ADMINAREA') && !empty($_SESSION['Language'])) $selected = (string) $_SESSION['Language'];
     elseif (isset($GLOBALS['CONFIG']['Language'])) $selected = (string) $GLOBALS['CONFIG']['Language'];
 
     $selected = strtolower(preg_replace('/[^A-Za-z_-]/', '', $selected));
@@ -710,6 +717,18 @@ function dnassl_lang(): array
     }
 
     return $lang;
+}
+
+/** Web server choices with labels in the client's language (English fallback). */
+function dnassl_webServers(): array
+{
+    $out = [];
+    foreach (Normalizer::WEB_SERVERS as $value => $label) {
+        $key         = 'webserver_' . strtolower($value);
+        $out[$value] = dnassl_t($key) !== $key ? dnassl_t($key) : $label;
+    }
+
+    return $out;
 }
 
 function dnassl_t(string $key): string

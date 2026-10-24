@@ -1,5 +1,16 @@
 <?php
 return [
+    'cfg_reseller' => 'Reseller ID',
+    'cfg_key' => 'API Key',
+    'cfg_test' => 'Test Mode',
+    'cfg_package' => 'Certificate',
+    'cfg_revoke' => 'Revoke on Termination',
+    'label_wildcard' => 'Wildcard',
+    'label_san' => 'SAN',
+    'btn_refresh' => 'Refresh Status',
+    'btn_revoke' => 'Revoke Certificate',
+    'webserver_apache' => 'Apache, nginx, LiteSpeed, cPanel, Plesk and others',
+    'webserver_iis' => 'Microsoft IIS',
     'err_key_is_live' => 'This is a live API key: untick Test Mode, save, and the certificate list loads.',
     'err_key_is_test' => 'This is a test API key: tick Test Mode, save, and the certificate list loads.',
     'cfg_test_desc' => 'Use the Domain Name API test environment (OTE) with a test API key.',

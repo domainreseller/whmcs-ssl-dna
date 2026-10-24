@@ -1,5 +1,16 @@
 <?php
 return [
+    'cfg_reseller' => 'Bayi ID',
+    'cfg_key' => 'API Anahtarı',
+    'cfg_test' => 'Test Modu',
+    'cfg_package' => 'Sertifika',
+    'cfg_revoke' => 'Sonlandırmada İptal Et',
+    'label_wildcard' => 'Wildcard',
+    'label_san' => 'SAN',
+    'btn_refresh' => 'Durumu Yenile',
+    'btn_revoke' => 'Sertifikayı İptal Et',
+    'webserver_apache' => 'Apache, nginx, LiteSpeed, cPanel, Plesk ve diğerleri',
+    'webserver_iis' => 'Microsoft IIS',
     'err_key_is_live' => 'Bu bir canlı API anahtarı: Test Mode\'un işaretini kaldırıp kaydedin, sertifika listesi yüklenir.',
     'err_key_is_test' => 'Bu bir test API anahtarı: Test Mode\'u işaretleyip kaydedin, sertifika listesi yüklenir.',
     'cfg_test_desc' => 'Test API anahtarıyla Domain Name API test ortamını (OTE) kullan.',
