@@ -37,6 +37,7 @@ dosyasını indirip WHMCS kök dizinine açın; `modules/servers/dnassl` klasör
 - Müşteri panelinden sertifika indirme (sertifika + CA zinciri) ve yeniden düzenleme
 - Yenileme, mevcut sertifikaya bağlı yenileme siparişi olarak yenileme fiyatıyla açılır, kayıtlı CSR kullanılır; müşterinin bir şey yapması gerekmez
 - Sonlandırmada isteğe bağlı iptal; yönetici için *Refresh Status* ve *Revoke Certificate* düğmeleri
+- İngilizce, Türkçe ve Farsça dil dosyaları; müşterinin ve yöneticinin WHMCS diline göre seçilir
 
 ## 📋 Gereksinimler
 

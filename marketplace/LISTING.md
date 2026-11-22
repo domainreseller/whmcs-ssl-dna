@@ -36,7 +36,7 @@ There is no server record to create. Enter your **Reseller ID** and **API Key** 
 * **Certificate download** (certificate + CA bundle) and **reissue** from the client area
 * **Admin tools**: Refresh Status and Revoke Certificate buttons, optional revoke on termination
 * **Safe by design**: the CSR's domain is checked before submission, approver e-mails are limited to the domain's own mailboxes, API key and private keys are never written to logs
-* **Multilingual**: English and Turkish client area and admin labels, following the client's and the admin's language
+* **Multilingual**: English, Turkish and Persian client area and admin labels, following the client's and the admin's language
 
 ## Quick Installation
 
@@ -60,6 +60,7 @@ Installation guide in English and Turkish on [GitHub](https://github.com/domainr
 * Renewal uses the new renew call: a renewal order linked to the current certificate at the renewal price, instead of a second purchase; the stored CSR is still submitted automatically
 * A renewal already opened from the reseller panel is picked up instead of being charged again
 * Renewal opens 30 days before the subscription ends; earlier than that nothing is bought and the renewal can be run again from the module queue
+* Persian (Farsi) language file
 ```
 
 ## Version 1.0.0 changelog (Markdown)
