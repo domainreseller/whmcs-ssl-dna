@@ -83,6 +83,7 @@ return [
     'err_no_package' => 'No certificate package is selected on this product.',
     'err_no_domain'  => 'A domain is required to order the certificate.',
     'err_no_order'   => 'No certificate order exists for this service yet.',
+    'err_not_found'  => 'No certificate for %s was found in your Domain Name API account.',
     'err_csr'        => 'Enter a valid CSR (it starts with -----BEGIN CERTIFICATE REQUEST-----).',
     'err_csr_cn'     => 'The CSR was created for %s, but this certificate is for %s. Create a CSR for the right domain.',
     'err_not_issued' => 'The certificate has not been issued yet.',

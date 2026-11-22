@@ -67,11 +67,15 @@ namespace {
     function check($label, $cond, $extra = '') { global $ok, $fail; if ($cond) { $ok++; echo "  ok   $label\n"; } else { $fail++; echo "  FAIL $label $extra\n"; } }
 
     // ---- fake gateway ------------------------------------------------------
-    $state = ['initialized' => 0, 'configured' => null, 'issued' => false, 'revoked' => 0, 'reissued' => null];
+    $state = ['initialized' => 0, 'renewed' => 0, 'current' => '', 'configured' => null, 'issued' => false, 'revoked' => 0, 'reissued' => null,
+              'listed' => 0, 'wrongId' => []];
     $calls = [];
-    $GLOBALS['dnassl_test_transport'] = function ($method, $url, $headers, $body) use (&$state, &$calls) {
+    // Certificate ids are GUIDs; "current" is the one the service must be using.
+    $guid = function ($n) { return sprintf('c0ffee00-0000-4000-8000-%012d', $n); };
+    $GLOBALS['dnassl_test_transport'] = function ($method, $url, $headers, $body) use (&$state, &$calls, $guid) {
         $path = parse_url($url, PHP_URL_PATH);
         $host = parse_url($url, PHP_URL_HOST);
+        parse_str((string) parse_url($url, PHP_URL_QUERY), $q);
         $calls[] = $method . ' ' . $host . $path;
         if ($path === '/api/v1/deposit/accounts/me') {
             return $host === 'ote.domainresellerapi.com' && in_array('X-API-KEY: TOPSECRETKEY', $headers, true)
@@ -82,6 +86,20 @@ namespace {
         if ($host !== 'ote.domainresellerapi.com' || !in_array('X-API-KEY: TOPSECRETKEY', $headers, true)) return [401, 'Unauthorized! Invalid API Key.'];
         $b = $body ? json_decode($body, true) : [];
         $j = function ($d, $s = 200) { return [$s, json_encode($d)]; };
+
+        // The gateway no longer finds a certificate by domain name: every call for an
+        // existing certificate must carry the current certificate id and no domain.
+        $byId = ['PUT /api/v1/ssls/configure' => 'b', 'PUT /api/v1/ssls/check-status' => 'b', 'POST /api/v1/ssls/reissue' => 'b',
+                 'GET /api/v1/ssls/certificate' => 'q', 'GET /api/v1/ssls/certificate-content' => 'q', 'DELETE /api/v1/ssls/revoke' => 'q'];
+        if (isset($byId[$method . ' ' . $path])) {
+            $sentId   = $byId[$method . ' ' . $path] === 'b' ? ($b['certificateId'] ?? null) : ($q['CertificateId'] ?? null);
+            $sentName = $byId[$method . ' ' . $path] === 'b' ? isset($b['domainName']) : isset($q['DomainName']);
+            if ($sentId !== $state['current'] || $sentName) {
+                $state['wrongId'][] = $method . ' ' . $path;
+                return [403, json_encode(['error' => ['code' => 'Ssl:10026', 'message' => 'Certificate not found']])];
+            }
+        }
+
         switch ($method . ' ' . $path) {
             case 'GET /api/v1/products/ssls':
                 return $j(['totalCount' => 2, 'items' => [
@@ -90,7 +108,21 @@ namespace {
                 ]]);
             case 'POST /api/v1/ssls/initialize':
                 $state['initialized']++;
-                return $j(['success' => true, 'certificateId' => 'c0ffee-' . $state['initialized'], 'status' => 'Pending']);
+                $state['current'] = $guid($state['initialized']);
+                return $j(['success' => true, 'certificateId' => $state['current'], 'status' => 'Pending']);
+            case 'POST /api/v1/ssls/renew':
+                if (!empty($state['renewTooEarly'])) return [403, json_encode(['error' => ['code' => 'Ssl:10057', 'message' => 'Renewal opens on 2027-10-01.']])];
+                if (($b['certificateId'] ?? '') !== $state['current']) return [403, json_encode(['error' => ['code' => 'Ssl:10026', 'message' => 'Certificate not found']])];
+                $state['renewed']++;
+                $state['current']    = $guid(100 + $state['renewed']);
+                $state['configured'] = null;
+                return $j(['success' => true, 'certificateId' => $state['current'], 'status' => 'WaitingForInstall']);
+            case 'GET /api/v1/ssls':
+                $state['listed']++;
+                return $j(['totalCount' => 2, 'items' => [
+                    ['certificateId' => $state['current'], 'domainName' => $q['DomainName'] ?? '', 'status' => 'Active'],
+                    ['certificateId' => $guid(999), 'domainName' => $q['DomainName'] ?? '', 'status' => 'Cancelled'],
+                ]]);
             case 'POST /api/v1/ssls/check-csr':
                 return $j(['domainName' => strpos($b['csr'], 'OTHER') !== false ? 'other.com' : 'shop.example.com']);
             case 'POST /api/v1/ssls/generate-csr':
@@ -147,7 +179,7 @@ namespace {
     echo "== create\n";
     check('create', dnassl_CreateAccount($params) === 'success');
     $row = DnaSsl_Store::get(7);
-    check('order stored, domain lower-cased', $row['certificate_id'] === 'c0ffee-1' && $row['domain'] === 'shop.example.com' && $row['status'] === 'awaiting_configuration');
+    check('order stored, domain lower-cased', $row['certificate_id'] === $guid(1) && $row['domain'] === 'shop.example.com' && $row['status'] === 'awaiting_configuration');
     check('create idempotent', dnassl_CreateAccount($params) === 'success' && $state['initialized'] === 1);
     check('create needs domain', dnassl_CreateAccount(['serviceid' => 8, 'domain' => ''] + $params) === dnassl_t('err_no_domain'));
 
@@ -168,6 +200,7 @@ namespace {
     check('configure with generated CSR', dnassl_configure($params) === 'success');
     $c = $state['configured'];
     check('configure payload', $c['authenticationType'] === 'CNAME' && $c['webServerType'] === 'Apache' && $c['approverMail'] === 'webmaster@shop.example.com', json_encode($c));
+    check('configure addresses the certificate by id', $c['certificateId'] === $guid(1) && !isset($c['domainName']), json_encode($c));
     check('SANs capped to package and CN dropped', $c['sanList'] === 'a.example.com,b.example.com', $c['sanList'] ?? '');
     check('contact phone split', $c['contact']['phoneCountryCode'] === '90' && $c['contact']['phone'] === '5321234567' && $c['contact']['companyName'] === 'Ada Lovelace'
         && $c['contact']['faxCountryCode'] === '90' && $c['contact']['fax'] === '5321234567');
@@ -183,21 +216,37 @@ namespace {
     check('refresh', dnassl_refreshStatus($params) === 'success' && DnaSsl_Store::get(7)['status'] === 'active');
     $ca = dnassl_ClientArea($params);
     check('client area active, key available', $ca['vars']['dnaStatus'] === 'active' && $ca['vars']['dnaHasKey'] === true);
-    check('admin fields', strpos(implode(' ', dnassl_AdminServicesTabFields($params)), 'c0ffee-1') !== false);
+    check('admin fields', strpos(implode(' ', dnassl_AdminServicesTabFields($params)), $guid(1)) !== false);
 
     $_POST = ['token' => 'tok', 'csr' => "-----BEGIN CERTIFICATE REQUEST-----\nNEW\n-----END CERTIFICATE REQUEST-----", 'approver' => 'evil@attacker.test'];
     check('reissue', dnassl_reissue($params) === 'success');
     check('foreign approver rejected', $state['reissued']['approverMail'] === 'admin@shop.example.com');
     check('new CSR drops stale key', empty(DnaSsl_Store::get(7)['private_key']));
 
+    echo "== legacy rows\n";
+    // A row written when initialize returned no id keeps the domain where the id belongs.
+    // It is matched to the current certificate on that domain once, then remembered.
+    DnaSsl_Store::save(7, ['certificate_id' => 'shop.example.com']);
+    $_POST = ['token' => 'tok'];
+    check('row without an id is looked up by domain', dnassl_refreshStatus($params) === 'success' && $state['listed'] === 1 && DnaSsl_Store::get(7)['certificate_id'] === $guid(1));
+    check('the id found is remembered', dnassl_refreshStatus($params) === 'success' && $state['listed'] === 1);
+
     echo "== renew / terminate\n";
-    check('renew reconfigures with stored CSR', dnassl_Renew($params) === 'success' && $state['initialized'] === 2 && DnaSsl_Store::get(7)['configured']);
+    $state['renewTooEarly'] = true;
+    check('renew too early buys nothing and says why', dnassl_Renew($params) === 'Renewal opens on 2027-10-01.' && $state['initialized'] === 1 && $state['renewed'] === 0
+        && DnaSsl_Store::get(7)['certificate_id'] === $guid(1));
+    $state['renewTooEarly'] = false;
+    check('renew uses the renew call, not a second purchase', dnassl_Renew($params) === 'success' && $state['renewed'] === 1 && $state['initialized'] === 1);
+    check('renewal certificate stored and configured with the stored CSR', DnaSsl_Store::get(7)['certificate_id'] === $guid(101) && DnaSsl_Store::get(7)['configured']
+        && $state['configured']['certificateId'] === $guid(101) && strpos($state['configured']['csr'], 'NEW') !== false, json_encode($state['configured']));
     check('terminate revokes when enabled', dnassl_TerminateAccount($params) === 'success' && $state['revoked'] === 1);
     $state['revokeUnsupported'] = true;
     check('terminate survives unrevokable package', dnassl_TerminateAccount($params) === 'success');
     check('admin revoke reports unrevokable package', dnassl_revoke($params) === 'Package is not supported');
     $state['revokeUnsupported'] = false;
     check('terminate no-op when disabled', dnassl_TerminateAccount(['configoption5' => ''] + $params) === 'success' && $state['revoked'] === 1);
+
+    check('every call for an existing certificate carried its id', $state['wrongId'] === [], json_encode($state['wrongId']));
 
     echo "== logging\n";
     $flat = json_encode($logs);

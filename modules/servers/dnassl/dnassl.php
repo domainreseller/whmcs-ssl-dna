@@ -11,8 +11,9 @@
  * (-> /ssls/configure); status, DCV instructions and the issued certificate are read
  * back from the gateway on every visit.
  *
- * The gateway identifies a certificate by its domain, so the domain the order was
- * opened for is stored with the service and used for every later call.
+ * The gateway identifies a certificate by its certificate id (one domain can have
+ * several certificates), so the id returned when the order is opened or renewed is
+ * stored with the service and used for every later call.
  *
  * Target: PHP 7.4+, WHMCS 8.0 and later.
  */
@@ -200,9 +201,15 @@ function dnassl_CreateAccount(array $params)
 }
 
 /**
- * Renewal is a new order for the same domain. When the client configured the previous
- * one, the same CSR and validation choice are submitted again so the renewal needs no
- * action from them; otherwise they configure it like a new order.
+ * Renewal is the gateway's renew call: a new certificate linked to the current one, at
+ * the renewal price. When the client configured the previous one, the same CSR and
+ * validation choice are submitted again so the renewal needs no action from them;
+ * otherwise they configure it like a new order.
+ *
+ * A certificate that is cancelled or unknown to the gateway cannot be renewed and gets a
+ * new order instead. While the gateway refuses for any other reason (renewal opens 30
+ * days before the subscription ends, balance, ...) nothing is bought: its message is
+ * returned and the renewal can be run again from the module queue.
  */
 function dnassl_Renew(array $params)
 {
@@ -216,23 +223,31 @@ function dnassl_Renew(array $params)
     $api = dnassl_api($params);
 
     try {
-        $result = $api->initialize($package, $domain);
+        try {
+            $current = dnassl_certificateId($api, $params, ['domain' => $domain] + $row);
+        } catch (ApiException $e) {
+            if (!$e->isNotFound()) throw $e;
+            $current = '';
+        }
+        $result = $api->renewOrReplace($current, $package, $domain);
     } catch (ApiException $e) {
         return dnassl_fail('Renew', $params, $e);
     }
 
+    $certificateId = (string) ($result['certificateId'] ?? '');
+
     DnaSsl_Store::save($serviceId, [
-        'certificate_id' => (string) ($result['certificateId'] ?? '') ?: $domain,
+        'certificate_id' => $certificateId ?: $domain,
         'domain'         => $domain,
         'package'        => $package,
         'status'         => 'awaiting_configuration',
         'configured'     => false,
     ]);
 
-    if (trim((string) ($row['csr'] ?? '')) === '') return 'success';
+    if (trim((string) ($row['csr'] ?? '')) === '' || !Client::isCertificateId($certificateId)) return 'success';
 
     try {
-        $api->configure(dnassl_configureInput($params, $row));
+        $api->configure(dnassl_configureInput($params, ['certificate_id' => $certificateId, 'domain' => $domain] + $row));
     } catch (ApiException $e) {
         // The order exists; the client can still configure it by hand.
         dnassl_fail('Renew (configure)', $params, $e);
@@ -281,7 +296,8 @@ function dnassl_refresh(array $params)
     if (empty($row['domain'])) return dnassl_t('err_no_order');
 
     try {
-        $status = dnassl_api($params)->checkStatus($row['domain']);
+        $api    = dnassl_api($params);
+        $status = $api->checkStatus(dnassl_certificateId($api, $params, $row));
     } catch (ApiException $e) {
         return dnassl_fail('refresh', $params, $e);
     }
@@ -300,7 +316,8 @@ function dnassl_revoke(array $params, bool $lenient = false)
     if (empty($row['domain'])) return dnassl_t('err_no_order');
 
     try {
-        dnassl_api($params)->revoke($row['domain']);
+        $api = dnassl_api($params);
+        $api->revoke(dnassl_certificateId($api, $params, $row));
     } catch (ApiException $e) {
         if ($lenient && $e->isUnsupported()) {
             dnassl_fail('revoke (skipped, package cannot be revoked)', $params, $e);
@@ -369,7 +386,7 @@ function dnassl_ClientArea(array $params)
     $api = dnassl_api($params);
 
     try {
-        $detail          = $api->certificate($row['domain']);
+        $detail          = $api->certificate(dnassl_certificateId($api, $params, $row));
         $vars['issuedAt']   = substr((string) ($detail['certificate']['issuedAt'] ?? ''), 0, 10);
         $vars['validUntil'] = substr((string) ($detail['certificate']['validUntil'] ?? ($detail['subscription']['expiresAt'] ?? '')), 0, 10);
         $vars['status']  = Normalizer::status($detail);
@@ -478,6 +495,7 @@ function dnassl_configure(array $params)
     ];
 
     try {
+        $fields['certificate_id'] = dnassl_certificateId($api, $params, $row);
         $api->configure(dnassl_configureInput($params, $fields + $row));
     } catch (ApiException $e) {
         return dnassl_fail('configure', $params, $e);
@@ -504,7 +522,7 @@ function dnassl_reissue(array $params)
     $approver = dnassl_approver($row['domain'], (string) ($_POST['approver'] ?? $row['approver']), dnassl_allowedApprovers($api, $row));
 
     try {
-        $api->reissue($row['domain'], $csr, $approver);
+        $api->reissue(dnassl_certificateId($api, $params, $row), $csr, $approver);
     } catch (ApiException $e) {
         return dnassl_fail('reissue', $params, $e);
     }
@@ -531,7 +549,8 @@ function dnassl_downloadCertificate(array $params)
     if (empty($row['domain'])) return dnassl_t('err_no_order');
 
     try {
-        list($crt, $ca) = Normalizer::pem(dnassl_api($params)->certificateContent($row['domain']));
+        $api            = dnassl_api($params);
+        list($crt, $ca) = Normalizer::pem($api->certificateContent(dnassl_certificateId($api, $params, $row)));
     } catch (ApiException $e) {
         return dnassl_fail('downloadCertificate', $params, $e);
     }
@@ -583,6 +602,30 @@ function dnassl_transport(): ?callable
         ? $GLOBALS['dnassl_test_transport'] : null;
 }
 
+/**
+ * The gateway id of the service's certificate.
+ *
+ * The gateway addresses a certificate by its id only, since one domain can have several.
+ * A row that still carries the domain where the id belongs (written when initialize
+ * returned no id) is looked up by domain once and the id is stored. Throws a not-found
+ * ApiException when the gateway has no certificate for the domain.
+ */
+function dnassl_certificateId(Client $api, array $params, array $row): string
+{
+    $id = trim((string) ($row['certificate_id'] ?? ''));
+    if (Client::isCertificateId($id)) return $id;
+
+    $domain = (string) ($row['domain'] ?? '');
+    $id     = $domain !== '' ? $api->findCertificateId($domain) : '';
+    if ($id === '') {
+        throw new ApiException(sprintf(dnassl_t('err_not_found'), $domain), 404, 'Ssl:10026');
+    }
+
+    DnaSsl_Store::save((int) $params['serviceid'], ['certificate_id' => $id]);
+
+    return $id;
+}
+
 function dnassl_configureInput(array $params, array $row): array
 {
     $c     = $params['clientsdetails'];
@@ -590,7 +633,7 @@ function dnassl_configureInput(array $params, array $row): array
     $cc    = preg_replace('/\D/', '', (string) ($c['phonecc'] ?? ''));
 
     $input = [
-        'domainName'         => $row['domain'],
+        'certificateId'      => (string) ($row['certificate_id'] ?? ''),
         'csr'                => $row['csr'],
         'approverMail'       => $row['approver'] ?: dnassl_approver($row['domain'], ''),
         'authenticationType' => Normalizer::dcvToApi((string) $row['dcv_method']),

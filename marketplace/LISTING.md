@@ -29,7 +29,7 @@ There is no server record to create. Enter your **Reseller ID** and **API Key** 
 
 ## Features
 
-* **Automatic ordering** on activation, renewal as a new order that reuses the client's CSR
+* **Automatic ordering** on activation, renewal linked to the current certificate that reuses the client's CSR
 * **CSR paste or generation**: clients without a CSR get one generated, with a private key download
 * **Domain validation by e-mail, HTTP file or DNS (CNAME)**, with the exact file or DNS record to publish
 * **Additional domains (SAN)** up to the package limit on multi-domain certificates

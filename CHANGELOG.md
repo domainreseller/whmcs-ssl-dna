@@ -1,5 +1,27 @@
 # Changelog
 
+## Unreleased
+
+Required update. Domain Name API changed its SSL API on 2026-11-20: a certificate is now
+addressed by its certificate ID instead of its domain name. Version 1.0.0 still sends the
+domain name, so it can no longer configure, refresh, download, reissue or revoke a
+certificate.
+
+- Every call for an existing certificate sends its Domain Name API certificate ID. The ID
+  has been stored with each order since 1.0.0, so existing services keep working without
+  any migration. A service that has no ID is matched once to the newest current
+  certificate on its domain.
+- Renewal uses the gateway's new renew call: a renewal order linked to the current
+  certificate, charged at the renewal price, instead of a second purchase. The stored CSR
+  is still submitted automatically.
+  - A certificate that is cancelled or no longer exists at Domain Name API gets a new
+    order, as before.
+  - A renewal already opened for the certificate (for example from the reseller panel) is
+    picked up instead of being charged again.
+  - Domain Name API opens renewal 30 days before the subscription ends. Earlier than that
+    nothing is bought: the gateway's message is shown and the renewal can be run again
+    from the module queue.
+
 ## 1.0.0 — 2026-10-24
 
 First release.

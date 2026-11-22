@@ -35,7 +35,7 @@ dosyasını indirip WHMCS kök dizinine açın; `modules/servers/dnassl` klasör
 - E-posta, HTTP dosyası veya DNS (CNAME) doğrulama; yayınlanacak dosya / kayıt birebir gösterilir
 - Paket limitine kadar ek alan adı (SAN)
 - Müşteri panelinden sertifika indirme (sertifika + CA zinciri) ve yeniden düzenleme
-- Yenileme yeni sipariş olarak açılır, kayıtlı CSR kullanılır; müşterinin bir şey yapması gerekmez
+- Yenileme, mevcut sertifikaya bağlı yenileme siparişi olarak yenileme fiyatıyla açılır, kayıtlı CSR kullanılır; müşterinin bir şey yapması gerekmez
 - Sonlandırmada isteğe bağlı iptal; yönetici için *Refresh Status* ve *Revoke Certificate* düğmeleri
 
 ## 📋 Gereksinimler
@@ -69,8 +69,12 @@ kadar orada gösterilen talimatları izler.
 
 ## 🧩 Bilinmesi gerekenler
 
-- **Sertifika alan adıyla tanınır.** Domain Name API sertifikaları sipariş numarasıyla değil
-  alan adıyla tanır; modül siparişin açıldığı alan adını saklar.
+- **Sertifika, sertifika ID'siyle tanınır.** Domain Name API'de bir alan adının birden fazla
+  sertifikası olabilir (yenileme ile yenilenen sertifika yan yana durur); modül hizmetin
+  sertifika ID'sini saklar ve yönetici hizmet sayfasında gösterir.
+- **Yenileme, abonelik bitimine 30 gün kala açılır.** Daha erken ödenen bir yenilemeyi
+  Domain Name API reddeder ve ücret kesilmez; süre açıldığında modül kuyruğundan yeniden
+  çalıştırın. Eski dönemin kullanılmayan günleri yeni döneme aktarılmaz.
 - **Ek alan adları siparişle birlikte alınır.** API mevcut bir sertifikaya SAN ekleyemez.
 - **Doğrulama e-postası istek üzerine yeniden gönderilemez,** açık bir siparişte yöntem de
   değiştirilemez. Yeniden düzenleme (reissue) doğrulamayı baştan başlatır.
