@@ -9,7 +9,7 @@ Everything to paste into https://marketplace.whmcs.com (Domain Name API group �
 | Payment type | Free |
 | Download URL | https://github.com/domainreseller/whmcs-ssl-dna/releases/latest/download/DNASSL-WHMCS.zip |
 | Icon | `icon-512.png` |
-| Version | 1.0.0 |
+| Version | 1.1.0 |
 | Compatibility | WHMCS 8.0.0 – 9.1.0 (tested on 8.6.1) |
 
 ## Short description (≤ 150 characters)
@@ -50,6 +50,16 @@ No database setup, no cron job and no Composer dependencies.
 ## Documentation and Support
 
 Installation guide in English and Turkish on [GitHub](https://github.com/domainreseller/whmcs-ssl-dna). Need a reseller account? Visit [domainnameapi.com](https://www.domainnameapi.com/).
+```
+
+## Version 1.1.0 changelog (Markdown)
+
+```markdown
+* Required update: Domain Name API now identifies a certificate by its certificate ID instead of its domain name; version 1.0.0 can no longer configure, refresh, download, reissue or revoke certificates
+* Existing services keep working without any migration: the certificate ID has been stored with every order since 1.0.0
+* Renewal uses the new renew call: a renewal order linked to the current certificate at the renewal price, instead of a second purchase; the stored CSR is still submitted automatically
+* A renewal already opened from the reseller panel is picked up instead of being charged again
+* Renewal opens 30 days before the subscription ends; earlier than that nothing is bought and the renewal can be run again from the module queue
 ```
 
 ## Version 1.0.0 changelog (Markdown)
