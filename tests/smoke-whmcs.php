@@ -248,6 +248,32 @@ namespace {
 
     check('every call for an existing certificate carried its id', $state['wrongId'] === [], json_encode($state['wrongId']));
 
+    echo "== languages\n";
+    // A translation may leave strings out (they fall back to English) but must not invent
+    // keys, and must keep the %s / %d placeholders its English string has.
+    $langDir   = $dir . '/modules/servers/dnassl/lang';
+    $english   = include $langDir . '/english.php';
+    $holders   = function ($s) { preg_match_all('/%(?:\d+\$)?[sd]/', (string) $s, $m); sort($m[0]); return $m[0]; };
+    $languages = [];
+    foreach (glob($langDir . '/*.php') as $file) {
+        $name = basename($file, '.php');
+        if ($name === 'english') continue;
+        $languages[] = $name;
+        $strings     = include $file;
+        $unknown     = is_array($strings) ? array_diff(array_keys($strings), array_keys($english)) : ['(not an array)'];
+        $broken      = [];
+        foreach (is_array($strings) ? $strings : [] as $key => $text) {
+            if (!is_string($text) || trim($text) === '') $broken[] = $key;
+            elseif (isset($english[$key]) && $holders($text) !== $holders($english[$key])) $broken[] = $key;
+        }
+        check("$name: only known keys", !$unknown, implode(', ', $unknown));
+        check("$name: strings and placeholders match English", !$broken, implode(', ', $broken));
+    }
+    sort($languages);
+    check('language files shipped', $languages === ['farsi', 'turkish'], implode(', ', $languages));
+    $farsi = include $langDir . '/farsi.php';
+    check('farsi translates every string', count($farsi) === count($english) && preg_match('/\p{Arabic}/u', $farsi['btn_refresh']) === 1);
+
     echo "== logging\n";
     $flat = json_encode($logs);
     check('api key passed for redaction', (bool) array_filter($logs, function ($l) { return ($l[3] ?? null) === ['TOPSECRETKEY']; }));

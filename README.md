@@ -37,6 +37,7 @@ and unpack it into the WHMCS root; it creates `modules/servers/dnassl`.
 - Certificate download (certificate + CA bundle) and reissue from the client area
 - Renewal as a renewal order linked to the current certificate, at the renewal price, reusing the stored CSR so the client has nothing to do
 - Optional revoke on termination; *Refresh Status* and *Revoke Certificate* buttons for admins
+- English, Turkish and Persian (Farsi) language files, following the client's and the admin's WHMCS language
 
 ## 📋 Requirements
 

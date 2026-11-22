@@ -21,6 +21,8 @@ certificate.
   - Domain Name API opens renewal 30 days before the subscription ends. Earlier than that
     nothing is bought: the gateway's message is shown and the renewal can be run again
     from the module queue.
+- Persian (Farsi) language file for the client area and the admin labels, contributed by
+  @inasrabadi (#1). It is used when the WHMCS language of the client or the admin is `farsi`.
 
 ## 1.0.0 — 2026-10-24
 
