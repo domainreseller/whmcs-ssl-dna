@@ -83,6 +83,7 @@ return [
     'err_no_package' => 'Bu üründe bir sertifika paketi seçilmemiş.',
     'err_no_domain'  => 'Sertifika siparişi için alan adı gereklidir.',
     'err_no_order'   => 'Bu hizmet için henüz bir sertifika siparişi yok.',
+    'err_not_found'  => 'Domain Name API hesabınızda %s için bir sertifika bulunamadı.',
     'err_csr'        => 'Geçerli bir CSR girin (-----BEGIN CERTIFICATE REQUEST----- ile başlar).',
     'err_csr_cn'     => 'CSR %s için oluşturulmuş, ancak bu sertifika %s için. Doğru alan adı için bir CSR oluşturun.',
     'err_not_issued' => 'Sertifika henüz düzenlenmedi.',

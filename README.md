@@ -35,7 +35,7 @@ and unpack it into the WHMCS root; it creates `modules/servers/dnassl`.
 - E-mail, HTTP file or DNS (CNAME) domain validation, with the exact file / record to publish
 - Additional domains (SAN) up to the package limit
 - Certificate download (certificate + CA bundle) and reissue from the client area
-- Renewal as a new order, reusing the stored CSR so the client has nothing to do
+- Renewal as a renewal order linked to the current certificate, at the renewal price, reusing the stored CSR so the client has nothing to do
 - Optional revoke on termination; *Refresh Status* and *Revoke Certificate* buttons for admins
 
 ## 📋 Requirements
@@ -69,8 +69,12 @@ follows the instructions shown there until the certificate is issued.
 
 ## 🧩 Things worth knowing
 
-- **A certificate is identified by its domain.** Domain Name API addresses certificates by
-  domain, not by order number, so the module stores the domain the order was opened for.
+- **A certificate is identified by its certificate ID.** A domain can have more than one
+  certificate at Domain Name API (a renewal next to the one it renews), so the module
+  stores the ID of the service's certificate and shows it on the admin service page.
+- **Renewal opens 30 days before the subscription ends.** A renewal paid earlier than that
+  is refused by Domain Name API and nothing is charged; run it again from the module queue
+  once the window is open. Unused days of the old term are not carried over.
 - **Additional domains are taken with the order.** The API cannot add a SAN to an existing
   certificate.
 - **Validation e-mails cannot be re-sent on request,** and the method cannot be changed on
